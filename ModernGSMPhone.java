@@ -15,7 +15,6 @@ public class ModernGSMPhone extends JFrame {
     private long pressStartTime;
     private final int LONG_PRESS_THRESHOLD = 700;
 
-    // UserInterface components
     private JTextField displayField;
     private JPanel phoneBody;
     private JPanel keypadPanel;
@@ -31,19 +30,17 @@ public class ModernGSMPhone extends JFrame {
     private final Color BUTTON_TEXT_COLOR = new Color(230, 230, 230);
     private final Color BUTTON_SUBTEXT_COLOR = new Color(180, 180, 180);
 
-    // Fonts
     private final Font DISPLAY_FONT = new Font("Segoe UI", Font.BOLD, 28);
     private final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 20);
     private final Font SUBTEXT_FONT = new Font("Segoe UI", Font.PLAIN, 12);
     private final Font STATUS_FONT = new Font("Segoe UI", Font.PLAIN, 12);
 
-    // Dictionary for predictive text
     private Dictionary dictionary;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
-                // Set system look and feel for better integration
+                // UI Feel
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
                 e.printStackTrace();
@@ -53,10 +50,10 @@ public class ModernGSMPhone extends JFrame {
     }
 
     public ModernGSMPhone() {
-        dictionary = new Dictionary(); // Initialize the dictionary
-        suggestionPopup = new JPopupMenu(); // Initialize the suggestion popup
+        dictionary = new Dictionary();
+        suggestionPopup = new JPopupMenu();
 
-        // Set up the main frame
+        // Main Frame
         setTitle("Aladejobi's GSM Phone");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(380, 700);
@@ -70,7 +67,6 @@ public class ModernGSMPhone extends JFrame {
                 Graphics2D g2d = (Graphics2D) g;
                 g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-                // Create gradient background
                 GradientPaint gradient = new GradientPaint(
                         0, 0, PHONE_BODY_COLOR,
                         0, getHeight(), new Color(20, 22, 26));
@@ -82,7 +78,6 @@ public class ModernGSMPhone extends JFrame {
         phoneBody.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         setContentPane(phoneBody);
 
-        // Create components
         createDisplayPanel();
         createKeypadPanel();
         createStatusPanel();
@@ -95,12 +90,10 @@ public class ModernGSMPhone extends JFrame {
         displayPanel.setBackground(PHONE_BODY_COLOR);
         displayPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        // Create a rounded panel for the display
         JPanel displayContainer = new JPanel(new BorderLayout());
         displayContainer.setBackground(DISPLAY_BG_COLOR);
         displayContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // Text display field
         displayField = new JTextField();
         displayField.setFont(DISPLAY_FONT);
         displayField.setForeground(DISPLAY_TEXT_COLOR);
@@ -116,7 +109,7 @@ public class ModernGSMPhone extends JFrame {
     }
 
     private void createKeypadPanel() {
-        keypadPanel = new JPanel(new GridLayout(4, 3, 10, 10));
+        keypadPanel = new JPanel(new GridLayout(5, 3, 10, 10));
         keypadPanel.setBackground(PHONE_BODY_COLOR);
 
         String[][] buttonLabels = {
@@ -129,20 +122,17 @@ public class ModernGSMPhone extends JFrame {
                 { "7", "PQRS" },
                 { "8", "TUV" },
                 { "9", "WXYZ" },
-                { "*", "+ ✏" },
-                { "0", "Space" },
-                { "#", "@? 📖" }
+                { "*", "+" },
+                { "0", "P | S" },
+                { "#", "@?" }
         };
 
-        // Create each button with modern styling
         for (String[] labelPair : buttonLabels) {
             String buttonKey = labelPair[0];
             String subText = labelPair[1];
 
-            // Create a custom button with rounded corners
             JButton button = createStylishButton(buttonKey, subText);
 
-            // Add mouse listeners for button press effects
             button.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
@@ -159,7 +149,7 @@ public class ModernGSMPhone extends JFrame {
                                     togglePredictionMode();
                                 });
                             }
-                        }, 1000); // 1-second hold activates Prediction Mode
+                        }, 1000);
                     }
                 }
 
@@ -195,8 +185,13 @@ public class ModernGSMPhone extends JFrame {
             keypadPanel.add(button);
         }
 
-        // Add delete button
-        JButton deleteButton = createStylishButton("⌫", "Delete");
+        JButton deleteButton = new JButton("DEL");
+        deleteButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        deleteButton.setBackground(BUTTON_COLOR);
+        deleteButton.setForeground(BUTTON_TEXT_COLOR);
+        deleteButton.setFocusPainted(false);
+        deleteButton.setBorderPainted(false);
+        deleteButton.setOpaque(true);
         deleteButton.addActionListener(e -> handleDelete());
         keypadPanel.add(deleteButton);
 
@@ -205,18 +200,21 @@ public class ModernGSMPhone extends JFrame {
 
     private void togglePredictionMode() {
         isPredictiveMode = !isPredictiveMode;
-        suggestionPopup.setVisible(false); // Hide suggestions when toggling mode
+        suggestionPopup.setVisible(false);
         statusLabel.setText(isPredictiveMode ? "Predictive text mode enabled" : "Standard text mode");
     }
 
     private void handleButtonPress(String buttonKey) {
         if (isPredictiveMode) {
-            currentText += buttonKey;
-            displayField.setText(currentText); // Update the display with the current text
-            List<String> predictions = dictionary.predictNextWords(currentText);
-            showSuggestions(predictions);
+            String[] letters = getButtonMap().get(buttonKey);
+            if (letters != null && letters.length > 0) {
+                currentText += letters[0];
+                displayField.setText(currentText);
+                List<String> predictions = dictionary.predictNextWords(currentText);
+                showSuggestions(predictions);
+            }
         } else {
-            // Standard mode: Cycle through letters
+
             if (!buttonKey.equals(lastButtonPressed)) {
                 lockInCharacter();
                 lastButtonPressed = buttonKey;
@@ -250,29 +248,29 @@ public class ModernGSMPhone extends JFrame {
     private void handleDelete() {
         if (!currentText.isEmpty()) {
             currentText = currentText.substring(0, currentText.length() - 1); // Remove the last character
-            displayField.setText(currentText); // Update the display
+            displayField.setText(currentText);
             if (isPredictiveMode) {
                 List<String> predictions = dictionary.predictNextWords(currentText);
-                showSuggestions(predictions); // Update suggestions
+                showSuggestions(predictions);
             }
         }
     }
 
     private void showSuggestions(List<String> predictions) {
-        suggestionPopup.removeAll(); // Clear previous suggestions
+        suggestionPopup.removeAll();
 
         for (String suggestion : predictions) {
             JMenuItem item = new JMenuItem(suggestion);
             item.addActionListener(e -> {
-                currentText = suggestion; // Update the current text with the selected suggestion
+                currentText = suggestion;
                 displayField.setText(currentText);
-                suggestionPopup.setVisible(false); // Hide the popup after selection
+                suggestionPopup.setVisible(false);
             });
             suggestionPopup.add(item);
         }
 
         if (!predictions.isEmpty()) {
-            suggestionPopup.show(displayField, 0, displayField.getHeight()); // Show the popup below the display field
+            suggestionPopup.show(displayField, 0, displayField.getHeight());
         }
     }
 
@@ -337,12 +335,10 @@ public class ModernGSMPhone extends JFrame {
         button.setContentAreaFilled(false);
         button.setOpaque(true);
 
-        // Main text label
         JLabel mainLabel = new JLabel(mainText, JLabel.CENTER);
         mainLabel.setFont(BUTTON_FONT);
         mainLabel.setForeground(BUTTON_TEXT_COLOR);
 
-        // Sub text label
         JLabel subLabel = new JLabel(subText, JLabel.CENTER);
         subLabel.setFont(SUBTEXT_FONT);
         subLabel.setForeground(BUTTON_SUBTEXT_COLOR);
