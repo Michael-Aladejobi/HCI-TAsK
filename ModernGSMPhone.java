@@ -1,8 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.RoundRectangle2D;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -11,7 +10,6 @@ public class ModernGSMPhone extends JFrame {
     private String currentText = "";
     private String currentCharacter = "";
     private String lastButtonPressed = "";
-    private HashMap<String, String[]> buttonMap = new HashMap<>();
     private Timer timer;
     private final int TIMEOUT = 1000;
     private long pressStartTime;
@@ -22,7 +20,7 @@ public class ModernGSMPhone extends JFrame {
     private JPanel phoneBody;
     private JPanel keypadPanel;
     private JLabel statusLabel;
-    private JPanel functionPanel;
+    private JPopupMenu suggestionPopup;
 
     private final Color PHONE_BODY_COLOR = new Color(40, 44, 52);
     private final Color DISPLAY_BG_COLOR = new Color(30, 30, 30);
@@ -32,14 +30,15 @@ public class ModernGSMPhone extends JFrame {
     private final Color BUTTON_PRESS_COLOR = new Color(100, 100, 120);
     private final Color BUTTON_TEXT_COLOR = new Color(230, 230, 230);
     private final Color BUTTON_SUBTEXT_COLOR = new Color(180, 180, 180);
-    private final Color ACCENT_COLOR = new Color(86, 156, 214);
-    private final Color CLEAR_BUTTON_COLOR = new Color(203, 65, 65);
 
     // Fonts
     private final Font DISPLAY_FONT = new Font("Segoe UI", Font.BOLD, 28);
     private final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 20);
     private final Font SUBTEXT_FONT = new Font("Segoe UI", Font.PLAIN, 12);
     private final Font STATUS_FONT = new Font("Segoe UI", Font.PLAIN, 12);
+
+    // Dictionary for predictive text
+    private Dictionary dictionary;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -54,8 +53,8 @@ public class ModernGSMPhone extends JFrame {
     }
 
     public ModernGSMPhone() {
-        // Activating/initializing button mappings..
-        loadButtonMap();
+        dictionary = new Dictionary(); // Initialize the dictionary
+        suggestionPopup = new JPopupMenu(); // Initialize the suggestion popup
 
         // Set up the main frame
         setTitle("Aladejobi's GSM Phone");
@@ -64,7 +63,6 @@ public class ModernGSMPhone extends JFrame {
         setLocationRelativeTo(null); // Center on screen
         setResizable(false);
 
-        // Create main container with a subtle gradient background
         phoneBody = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -87,12 +85,9 @@ public class ModernGSMPhone extends JFrame {
         // Create components
         createDisplayPanel();
         createKeypadPanel();
-        createFunctionPanel();
         createStatusPanel();
 
         setVisible(true);
-
-        startCursorBlink();
     }
 
     private void createDisplayPanel() {
@@ -101,8 +96,8 @@ public class ModernGSMPhone extends JFrame {
         displayPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         // Create a rounded panel for the display
-        JPanel displayContainer = new RoundedPanel(20, DISPLAY_BG_COLOR);
-        displayContainer.setLayout(new BorderLayout());
+        JPanel displayContainer = new JPanel(new BorderLayout());
+        displayContainer.setBackground(DISPLAY_BG_COLOR);
         displayContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
         // Text display field
@@ -113,17 +108,9 @@ public class ModernGSMPhone extends JFrame {
         displayField.setHorizontalAlignment(JTextField.RIGHT);
         displayField.setEditable(false);
         displayField.setBorder(null);
-        displayField.setCaretColor(ACCENT_COLOR);
 
         displayContainer.add(displayField, BorderLayout.CENTER);
         displayPanel.add(displayContainer, BorderLayout.CENTER);
-
-        // Add a phone header
-        JLabel phoneHeader = new JLabel("Aladejobi's GSM Phone", JLabel.CENTER);
-        phoneHeader.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        phoneHeader.setForeground(new Color(200, 200, 200));
-        phoneHeader.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
-        displayPanel.add(phoneHeader, BorderLayout.NORTH);
 
         phoneBody.add(displayPanel, BorderLayout.NORTH);
     }
@@ -161,18 +148,31 @@ public class ModernGSMPhone extends JFrame {
                 public void mousePressed(MouseEvent e) {
                     pressStartTime = System.currentTimeMillis();
                     button.setBackground(BUTTON_PRESS_COLOR);
+
+                    // Check if the button is "0" and handle long press for Prediction Mode
+                    if (buttonKey.equals("0")) {
+                        timer = new Timer();
+                        timer.schedule(new TimerTask() {
+                            @Override
+                            public void run() {
+                                SwingUtilities.invokeLater(() -> {
+                                    togglePredictionMode();
+                                });
+                            }
+                        }, 1000); // 1-second hold activates Prediction Mode
+                    }
                 }
 
                 @Override
                 public void mouseReleased(MouseEvent e) {
                     button.setBackground(BUTTON_COLOR);
+                    if (timer != null) {
+                        timer.cancel();
+                    }
+
                     long pressDuration = System.currentTimeMillis() - pressStartTime;
 
-                    if (pressDuration >= LONG_PRESS_THRESHOLD) {
-                        // Long press: Lock in the number
-                        lockInCharacter(buttonKey);
-                    } else {
-                        // Short press: Cycle through letters
+                    if (pressDuration < LONG_PRESS_THRESHOLD && !buttonKey.equals("0")) {
                         handleButtonPress(buttonKey);
                     }
                 }
@@ -195,43 +195,123 @@ public class ModernGSMPhone extends JFrame {
             keypadPanel.add(button);
         }
 
+        // Add delete button
+        JButton deleteButton = createStylishButton("⌫", "Delete");
+        deleteButton.addActionListener(e -> handleDelete());
+        keypadPanel.add(deleteButton);
+
         phoneBody.add(keypadPanel, BorderLayout.CENTER);
     }
 
-    private void createFunctionPanel() {
-        functionPanel = new JPanel(new GridLayout(1, 2, 10, 0));
-        functionPanel.setBackground(PHONE_BODY_COLOR);
-        functionPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+    private void togglePredictionMode() {
+        isPredictiveMode = !isPredictiveMode;
+        suggestionPopup.setVisible(false); // Hide suggestions when toggling mode
+        statusLabel.setText(isPredictiveMode ? "Predictive text mode enabled" : "Standard text mode");
+    }
 
-        // Predictive mode button
-        JButton predictiveButton = createFunctionButton("Predictive", ACCENT_COLOR);
-        predictiveButton.addActionListener(e -> {
-            isPredictiveMode = !isPredictiveMode;
-            resetInput();
-
-            if (isPredictiveMode) {
-                displayField.setText("Predictive mode ON");
-                statusLabel.setText("Predictive text mode enabled");
-                predictiveButton.setBackground(new Color(50, 120, 180));
-            } else {
-                displayField.setText("");
-                statusLabel.setText("Standard text mode");
-                predictiveButton.setBackground(ACCENT_COLOR);
+    private void handleButtonPress(String buttonKey) {
+        if (isPredictiveMode) {
+            currentText += buttonKey;
+            displayField.setText(currentText); // Update the display with the current text
+            List<String> predictions = dictionary.predictNextWords(currentText);
+            showSuggestions(predictions);
+        } else {
+            // Standard mode: Cycle through letters
+            if (!buttonKey.equals(lastButtonPressed)) {
+                lockInCharacter();
+                lastButtonPressed = buttonKey;
+                currentCharacter = "";
             }
-        });
 
-        // Clear button
-        JButton clearButton = createFunctionButton("Clear", CLEAR_BUTTON_COLOR);
-        clearButton.addActionListener(e -> {
-            resetInput();
-            displayField.setText("");
-            statusLabel.setText("Text cleared");
-        });
+            String[] letters = getButtonMap().get(buttonKey);
+            if (letters != null) {
+                int currentIndex = getCurrentIndex(letters);
+                currentCharacter = letters[(currentIndex + 1) % letters.length];
+                updateDisplay();
+            }
 
-        functionPanel.add(predictiveButton);
-        functionPanel.add(clearButton);
+            if (timer != null) {
+                timer.cancel();
+            }
 
-        phoneBody.add(functionPanel, BorderLayout.SOUTH);
+            timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    SwingUtilities.invokeLater(() -> {
+                        lockInCharacter();
+                        updateDisplay();
+                    });
+                }
+            }, TIMEOUT);
+        }
+    }
+
+    private void handleDelete() {
+        if (!currentText.isEmpty()) {
+            currentText = currentText.substring(0, currentText.length() - 1); // Remove the last character
+            displayField.setText(currentText); // Update the display
+            if (isPredictiveMode) {
+                List<String> predictions = dictionary.predictNextWords(currentText);
+                showSuggestions(predictions); // Update suggestions
+            }
+        }
+    }
+
+    private void showSuggestions(List<String> predictions) {
+        suggestionPopup.removeAll(); // Clear previous suggestions
+
+        for (String suggestion : predictions) {
+            JMenuItem item = new JMenuItem(suggestion);
+            item.addActionListener(e -> {
+                currentText = suggestion; // Update the current text with the selected suggestion
+                displayField.setText(currentText);
+                suggestionPopup.setVisible(false); // Hide the popup after selection
+            });
+            suggestionPopup.add(item);
+        }
+
+        if (!predictions.isEmpty()) {
+            suggestionPopup.show(displayField, 0, displayField.getHeight()); // Show the popup below the display field
+        }
+    }
+
+    private void lockInCharacter() {
+        if (!currentCharacter.isEmpty()) {
+            currentText += currentCharacter;
+        }
+        currentCharacter = "";
+        lastButtonPressed = "";
+    }
+
+    private void updateDisplay() {
+        displayField.setText(currentText + currentCharacter);
+    }
+
+    private int getCurrentIndex(String[] letters) {
+        for (int i = 0; i < letters.length; i++) {
+            if (letters[i].equals(currentCharacter)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private java.util.Map<String, String[]> getButtonMap() {
+        java.util.Map<String, String[]> buttonMap = new java.util.HashMap<>();
+        buttonMap.put("1", new String[] { "1", ".", ",", "?" });
+        buttonMap.put("2", new String[] { "A", "B", "C", "2" });
+        buttonMap.put("3", new String[] { "D", "E", "F", "3" });
+        buttonMap.put("4", new String[] { "G", "H", "I", "4" });
+        buttonMap.put("5", new String[] { "J", "K", "L", "5" });
+        buttonMap.put("6", new String[] { "M", "N", "O", "6" });
+        buttonMap.put("7", new String[] { "P", "Q", "R", "S", "7" });
+        buttonMap.put("8", new String[] { "T", "U", "V", "8" });
+        buttonMap.put("9", new String[] { "W", "X", "Y", "Z", "9" });
+        buttonMap.put("0", new String[] { "0", " " });
+        buttonMap.put("*", new String[] { "*", "+", "-", "=" });
+        buttonMap.put("#", new String[] { "#", "@", "/", "_" });
+        return buttonMap;
     }
 
     private void createStatusPanel() {
@@ -273,184 +353,4 @@ public class ModernGSMPhone extends JFrame {
 
         return button;
     }
-
-    private JButton createFunctionButton(String text, Color bgColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        button.setForeground(Color.WHITE);
-        button.setBackground(bgColor);
-        button.setBorderPainted(false);
-        button.setFocusPainted(false);
-        button.setContentAreaFilled(false);
-        button.setOpaque(true);
-
-        // Add hover effects
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(bgColor.darker());
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(bgColor);
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-                button.setBackground(bgColor.darker().darker());
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                button.setBackground(bgColor);
-            }
-        });
-
-        return button;
-    }
-
-    private void handleButtonPress(String buttonKey) {
-        if (isPredictiveMode) {
-            displayField.setText("Predictive: " + buttonKey);
-            statusLabel.setText("Predictive mode not fully implemented");
-            return;
-        }
-
-        if (!buttonKey.equals(lastButtonPressed)) {
-            lockInCharacter();
-            lastButtonPressed = buttonKey;
-            currentCharacter = "";
-        }
-
-        String[] letters = buttonMap.get(buttonKey);
-        if (letters != null) {
-            int currentIndex = getCurrentIndex(letters);
-            currentCharacter = letters[(currentIndex + 1) % letters.length];
-            updateDisplay();
-            statusLabel.setText("Cycling: " + buttonKey + " → " + currentCharacter);
-        }
-
-        if (timer != null) {
-            timer.cancel();
-        }
-
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                SwingUtilities.invokeLater(() -> {
-                    lockInCharacter();
-                    updateDisplay();
-                });
-            }
-        }, TIMEOUT);
-    }
-
-    private void lockInCharacter() {
-        if (!currentCharacter.isEmpty()) {
-            currentText += currentCharacter;
-            statusLabel.setText("Character locked: " + currentCharacter);
-        }
-        currentCharacter = "";
-        lastButtonPressed = "";
-    }
-
-    private void lockInCharacter(String buttonKey) {
-        currentText += buttonKey;
-        currentCharacter = "";
-        lastButtonPressed = "";
-        updateDisplay();
-        statusLabel.setText("Number locked: " + buttonKey);
-    }
-
-    private void updateDisplay() {
-        displayField.setText(currentText + currentCharacter);
-    }
-
-    private int getCurrentIndex(String[] letters) {
-        for (int i = 0; i < letters.length; i++) {
-            if (letters[i].equals(currentCharacter)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private void loadButtonMap() {
-        buttonMap.put("1", new String[] { "1", ".", ",", "?" });
-        buttonMap.put("2", new String[] { "A", "B", "C", "2" });
-        buttonMap.put("3", new String[] { "D", "E", "F", "3" });
-        buttonMap.put("4", new String[] { "G", "H", "I", "4" });
-        buttonMap.put("5", new String[] { "J", "K", "L", "5" });
-        buttonMap.put("6", new String[] { "M", "N", "O", "6" });
-        buttonMap.put("7", new String[] { "P", "Q", "R", "S", "7" });
-        buttonMap.put("8", new String[] { "T", "U", "V", "8" });
-        buttonMap.put("9", new String[] { "W", "X", "Y", "Z", "9" });
-        buttonMap.put("0", new String[] { "0", " " });
-        buttonMap.put("*", new String[] { "*", "+", "-", "=" });
-        buttonMap.put("#", new String[] { "#", "@", "/", "_" });
-    }
-
-    private void resetInput() {
-        currentCharacter = "";
-        lastButtonPressed = "";
-        if (timer != null) {
-            timer.cancel();
-        }
-    }
-
-    private void startCursorBlink() {
-        Timer blinkTimer = new Timer();
-        final boolean[] showCursor = { true };
-
-        blinkTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                SwingUtilities.invokeLater(() -> {
-                    showCursor[0] = !showCursor[0];
-                    String text = currentText + currentCharacter;
-                    if (showCursor[0] && !isPredictiveMode) {
-                        displayField.setText(text + "|");
-                    } else {
-                        displayField.setText(text);
-                    }
-                });
-            }
-        }, 0, 500); // Blink every 500ms
-    }
-
-    private static class RoundedPanel extends JPanel {
-        private final int cornerRadius;
-        private final Color backgroundColor;
-
-        public RoundedPanel(int radius, Color bgColor) {
-            super();
-            this.cornerRadius = radius;
-            this.backgroundColor = bgColor;
-            setOpaque(false);
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2d = (Graphics2D) g.create();
-            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            // Create rounded rectangle
-            RoundRectangle2D roundedRect = new RoundRectangle2D.Float(
-                    0, 0, getWidth() - 1, getHeight() - 1, cornerRadius, cornerRadius);
-
-            g2d.setColor(backgroundColor);
-            g2d.fill(roundedRect);
-
-            // Add subtle inner shadow
-            g2d.setColor(new Color(0, 0, 0, 40));
-            g2d.draw(roundedRect);
-
-            g2d.dispose();
-        }
-    }
 }
-
-// workable

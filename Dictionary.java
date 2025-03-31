@@ -10,13 +10,13 @@
 
 import java.util.*;
 
-public class Predictor {
+public class Dictionary {
     private Set<String> dictionary;
 
-    public Predictor() {
+    public Dictionary() {
         dictionary = new HashSet<>(Arrays.asList(
-                // Basic Words
-                "HELLO", "WORLD", "YES", "NO", "OKAY", "PLEASE", "THANK", "SORRY", "LATER", "SOON",
+                
+            "HELLO", "WORLD", "YES", "NO", "OKAY", "PLEASE", "THANK", "SORRY", "LATER", "SOON",
                 "NOW", "TOMORROW", "YESTERDAY", "TODAY", "GOOD", "BAD", "FINE", "BYE", "WELCOME",
                 "MORNING", "EVENING", "NIGHT", "AFTERNOON", "FRIEND", "FAMILY", "LOVE", "HAPPY",
                 "SAD", "MONEY", "HOUSE", "FOOD", "WATER", "DRINK", "COCONUT", "BEANS", "RICE", "MEAT",
@@ -76,25 +76,3 @@ public class Predictor {
         return predictions;
     }
 }
-
-// import java.util.*;
-
-// public class Predictor {
-// private Set<String> dictionary;
-
-// public Predictor() {
-// dictionary = new HashSet<>(
-// Arrays.asList("HELLO", "WORLD", "JAVA", "FEATURE", "PHONE", "PREDICT",
-// "PREBLE", "JAVE"));
-// }
-
-// public List<String> predictNextWords(String input) {
-// List<String> predictions = new ArrayList<>();
-// for (String word : dictionary) {
-// if (word.startsWith(input)) {
-// predictions.add(word);
-// }
-// }
-// return predictions;
-// }
-// }
