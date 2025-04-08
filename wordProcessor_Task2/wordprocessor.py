@@ -13,7 +13,7 @@ class WordProcessor:
     def create_menu(self):
         menubar = tk.Menu(self.root)
         
-        # File menu
+        
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="New", command=self.new_file)
         file_menu.add_command(label="Open", command=self.open_file)
@@ -22,14 +22,14 @@ class WordProcessor:
         file_menu.add_command(label="Exit", command=self.exit_app)
         menubar.add_cascade(label="File", menu=file_menu)
         
-        # Edit menu
+       
         edit_menu = tk.Menu(menubar, tearoff=0)
         edit_menu.add_command(label="Cut", command=self.cut_text)
         edit_menu.add_command(label="Copy", command=self.copy_text)
         edit_menu.add_command(label="Paste", command=self.paste_text)
         menubar.add_cascade(label="Edit", menu=edit_menu)
         
-        # Format menu
+        
         format_menu = tk.Menu(menubar, tearoff=0)
         format_menu.add_command(label="Font", command=self.change_font)
         menubar.add_cascade(label="Format", menu=format_menu)
@@ -77,7 +77,6 @@ class WordProcessor:
         self.text_area.event_generate("<<Paste>>")
     
     def change_font(self):
-        # Font dialog implementation would go here
         pass
 
 if __name__ == "__main__":
